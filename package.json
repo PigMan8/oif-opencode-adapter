@@ -1,0 +1,34 @@
+{
+  "name": "oif-opencode-adapter",
+  "version": "0.1.0",
+  "description": "Optional OpenCode adapter for the Objective Integrity Framework (OIF).",
+  "type": "module",
+  "license": "Apache-2.0",
+  "main": "plugins/oif.js",
+  "exports": {
+    ".": "./plugins/oif.js"
+  },
+  "files": [
+    "plugins",
+    "examples",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "objective-integrity",
+    "ai-agents",
+    "agent-workflow"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "peerDependencies": {
+    "@opencode-ai/plugin": ">=1.0.0"
+  },
+  "devDependencies": {
+    "@opencode-ai/plugin": "^1.18.0"
+  }
+}

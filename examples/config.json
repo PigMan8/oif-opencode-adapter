@@ -1,0 +1,29 @@
+{
+  "schema": "chat-objective-continuity-config-v1",
+  "namespace": "opencode",
+  "host_binding": {
+    "session_env": "OIF_SESSION_ID",
+    "bindings_dir": "bindings"
+  },
+  "session_bindings": {},
+  "implicit_session_ledgers": true,
+  "data_root": "ledger",
+  "lock_timeout_seconds": 5,
+  "max_hook_input_bytes": 1048576,
+  "max_prompt_bytes": 262144,
+  "tool_classes": {
+    "read": "read_only",
+    "list": "read_only",
+    "glob": "read_only",
+    "grep": "read_only",
+    "webfetch": "read_only",
+    "skill": "read_only",
+    "todoread": "read_only",
+    "todowrite": "read_only",
+    "write": "mutating",
+    "edit": "mutating",
+    "patch": "mutating",
+    "bash": "mixed",
+    "task": "mixed"
+  }
+}

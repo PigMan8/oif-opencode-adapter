@@ -1,0 +1,11 @@
+oif-opencode-adapter
+Copyright 2026 The oif-opencode-adapter contributors
+
+This product includes software and documentation developed as part of the
+Objective Integrity Framework (https://github.com/Chisiki1/objective-integrity-framework),
+which is licensed under the Apache License, Version 2.0.
+
+The OpenCode adapter is an independent, optional host integration. It is not an
+official component of Objective Integrity Framework and is not "the framework
+identity". Objective Integrity Framework makes no claim about this adapter, and
+this adapter makes no claim to extend or replace the framework's core.
