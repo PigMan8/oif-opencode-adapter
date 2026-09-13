@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.2
+
+- Do not auto-provision a drive root, the home directory, or known system
+  directories; sessions opened there stay inactive instead of being modified.
+
 ## 0.2.1
 
 - Fix plugin loading: the module now exports only the plugin function. Test

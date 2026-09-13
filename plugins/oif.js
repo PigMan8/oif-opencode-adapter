@@ -34,7 +34,7 @@
 import { spawn } from "node:child_process"
 import { createHash, randomBytes } from "node:crypto"
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, symlinkSync, writeFileSync } from "node:fs"
-import { dirname, join, resolve } from "node:path"
+import { basename, dirname, join, parse, resolve } from "node:path"
 import { homedir, tmpdir } from "node:os"
 import { tool } from "@opencode-ai/plugin"
 
@@ -236,9 +236,33 @@ function ensureProjectConfig(project) {
 }
 
 function activate(project) {
-  if (!project || DISABLED) return
+  if (!project || DISABLED || isUnsafeProject(project)) return
   ensureInstalled(project)
   ensureProjectConfig(project)
+}
+
+// Never auto-provision a drive root, the home directory, or a known system
+// directory. Sessions opened there stay inactive instead of being modified.
+function isUnsafeProject(dir) {
+  try {
+    const p = resolve(dir)
+    if (p === parse(p).root) return true
+    if (p === resolve(homedir())) return true
+    const base = basename(p).toLowerCase()
+    return [
+      "windows",
+      "program files",
+      "program files (x86)",
+      "programdata",
+      "users",
+      "appdata",
+      "temp",
+      "tmp",
+      "system32",
+    ].includes(base)
+  } catch {
+    return true
+  }
 }
 
 function runProcess(project, scriptRel, argv, payload, env, timeoutMs = HOOK_TIMEOUT_MS) {
@@ -540,10 +564,11 @@ export const OIFPlugin = async ({ client, directory, worktree }) => {
     } catch {}
   }
 
-  if (!project || DISABLED) {
-    await log("info", "OIF adapter inactive (disabled or no project)", {
+  if (!project || DISABLED || isUnsafeProject(project)) {
+    await log("info", "OIF adapter inactive (disabled, no project, or unsafe location)", {
       directory,
       disabled: DISABLED,
+      project,
     })
     return {}
   }
@@ -1220,4 +1245,5 @@ OIFPlugin.__internal = {
   artifactInventoryDir,
   artifactProjectKey,
   newestInventory,
+  isUnsafeProject,
 }

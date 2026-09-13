@@ -1,6 +1,6 @@
 {
   "name": "oif-opencode-adapter",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Optional OpenCode adapter for the Objective Integrity Framework (OIF).",
   "type": "module",
   "license": "Apache-2.0",

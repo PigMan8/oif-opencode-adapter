@@ -1,8 +1,8 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { homedir, tmpdir } from "node:os"
+import { join, parse } from "node:path"
 
 import { OIFPlugin } from "../plugins/oif.js"
 
@@ -20,6 +20,7 @@ const {
   pick,
   artifactProjectKey,
   genEventId,
+  isUnsafeProject,
 } = OIFPlugin.__internal
 
 function makeProject() {
@@ -161,4 +162,11 @@ test("artifactProjectKey is stable 12 hex chars", () => {
 
 test("genEventId matches the safe event id shape", () => {
   assert.match(genEventId(), /^oc-[a-z0-9]+-[0-9a-f]+$/)
+})
+
+test("isUnsafeProject rejects roots, home, and system dirs", () => {
+  assert.equal(isUnsafeProject(parse(tmpdir()).root), true)
+  assert.equal(isUnsafeProject(homedir()), true)
+  assert.equal(isUnsafeProject(join(homedir(), "AppData")), true)
+  assert.equal(isUnsafeProject(join(tmpdir(), "my-project")), false)
 })
