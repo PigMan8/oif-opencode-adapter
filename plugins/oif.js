@@ -909,7 +909,7 @@ export const OIFPlugin = async ({ client, directory, worktree }) => {
             const ensureRegistry = async () => {
               if (existsSync(registry)) return null
               const built = await runOif(proj, ["catalog", "--output", registry], undefined, undefined, timeout)
-              return built.ok ? null : formatOifResult("catalog", built)
+              return built.ok || built.code === 0 ? null : formatOifResult("catalog", built)
             }
             const directInput = pick(ins.resolveInput, f.resolveInput)
             if (directInput !== undefined) {
