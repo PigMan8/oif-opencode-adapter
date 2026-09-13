@@ -31,7 +31,7 @@ function makeProject() {
   return root
 }
 
-test("resolveProject finds the nearest project containing .oif and config", () => {
+test("resolveProject finds the nearest project containing .oif", () => {
   const root = makeProject()
   try {
     const nested = join(root, "a", "b")
@@ -40,9 +40,12 @@ test("resolveProject finds the nearest project containing .oif and config", () =
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
+})
+
+test("resolveProject falls back to the session dir when no .oif exists", () => {
   const bare = mkdtempSync(join(tmpdir(), "oif-bare-"))
   try {
-    assert.equal(resolveProject([bare]), null)
+    assert.equal(resolveProject([bare]), bare)
   } finally {
     rmSync(bare, { recursive: true, force: true })
   }
