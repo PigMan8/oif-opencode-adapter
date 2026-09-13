@@ -1198,8 +1198,9 @@ export const OIFPlugin = async ({ client, directory, worktree }) => {
   }
 }
 
-// Internal helpers exported for unit tests. Not a public API.
-export const __internal = {
+// Internal helpers attached for unit tests. Not a public API, and NOT a module
+// export: OpenCode's plugin loader requires every module export to be a function.
+OIFPlugin.__internal = {
   resolveProject,
   loadConfig,
   runtimeSha256,

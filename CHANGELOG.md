@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+- Fix plugin loading: the module now exports only the plugin function. Test
+  helpers are attached as `OIFPlugin.__internal` instead of a second export,
+  which OpenCode's plugin loader rejects ("Plugin export is not a function").
+
 ## 0.2.0
 
 - Auto-provision any project: use a shared runtime at `~/.config/opencode/oif`

@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { __internal } from "../plugins/oif.js"
+import { OIFPlugin } from "../plugins/oif.js"
 
 const {
   resolveProject,
@@ -20,7 +20,7 @@ const {
   pick,
   artifactProjectKey,
   genEventId,
-} = __internal
+} = OIFPlugin.__internal
 
 function makeProject() {
   const root = mkdtempSync(join(tmpdir(), "oif-adapter-"))
