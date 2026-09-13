@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0
+
+- Auto-provision any project: use a shared runtime at `~/.config/opencode/oif`
+  and create `.oif` (directory link) plus `.oif-state/config.json` on first use.
+- The session directory now takes precedence over `OIF_PROJECT` when resolving
+  the project, so a new project gets its own state.
+- Add `OIF_HOME` (shared runtime location) and `OIF_DISABLE` (opt out).
+
 ## 0.1.0
 
 - Initial OpenCode adapter.

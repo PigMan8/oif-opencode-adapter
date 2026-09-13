@@ -33,7 +33,7 @@
 
 import { spawn } from "node:child_process"
 import { createHash, randomBytes } from "node:crypto"
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs"
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 import { homedir, tmpdir } from "node:os"
 import { tool } from "@opencode-ai/plugin"
@@ -50,6 +50,8 @@ const LEDGER_INPUT_REL = join(
 const OIF_REL = join(".oif", "tools", "oif.py")
 const CONFIG_REL = join(".oif-state", "config.json")
 const BINDINGS_REL = join(".oif-state", "bindings")
+const GLOBAL_OIF = process.env.OIF_HOME || join(homedir(), ".config", "opencode", "oif")
+const DISABLED = process.env.OIF_DISABLE === "1" || process.env.OIF_DISABLE === "true"
 const SERVICE = "oif"
 
 const PYTHON =
@@ -131,27 +133,112 @@ function runtimeSha256(project) {
   }
 }
 
-function resolveProject(starts) {
-  const seen = new Set()
-  for (const start of starts.filter(Boolean)) {
-    let dir
-    try {
-      dir = resolve(start)
-    } catch {
-      continue
-    }
-    for (let depth = 0; depth < 60; depth++) {
-      if (seen.has(dir)) break
-      seen.add(dir)
-      if (existsSync(join(dir, RUNTIME_REL)) && existsSync(join(dir, CONFIG_REL))) {
-        return dir
-      }
-      const parent = dirname(dir)
-      if (parent === dir) break
-      dir = parent
-    }
+function hasOif(dir) {
+  return existsSync(join(dir, RUNTIME_REL)) || existsSync(join(dir, CONFIG_REL))
+}
+
+function findMarkerUp(start, seen) {
+  let dir
+  try {
+    dir = resolve(start)
+  } catch {
+    return null
+  }
+  for (let depth = 0; depth < 60; depth++) {
+    if (seen.has(dir)) break
+    seen.add(dir)
+    if (hasOif(dir)) return dir
+    const parent = dirname(dir)
+    if (parent === dir) break
+    dir = parent
   }
   return null
+}
+
+function resolveProject(starts, override) {
+  const seen = new Set()
+  const session = starts.filter(Boolean)
+  // 1. Nearest ancestor with a project-local OIF, from the session location.
+  for (const start of session) {
+    const found = findMarkerUp(start, seen)
+    if (found) return found
+  }
+  // 2. No project-local OIF: use the session directory and provision it.
+  for (const start of session) {
+    try {
+      const dir = resolve(start)
+      if (existsSync(dir)) return dir
+    } catch {}
+  }
+  // 3. Explicit override / cwd as a last resort.
+  if (override) {
+    const found = findMarkerUp(override, seen)
+    if (found) return found
+    try {
+      const dir = resolve(override)
+      if (existsSync(dir)) return dir
+    } catch {}
+  }
+  return null
+}
+
+const DEFAULT_CONFIG = {
+  schema: "chat-objective-continuity-config-v1",
+  namespace: "opencode",
+  host_binding: { session_env: "OIF_SESSION_ID", bindings_dir: "bindings" },
+  session_bindings: {},
+  implicit_session_ledgers: true,
+  data_root: "ledger",
+  tool_classes: {
+    read: "read_only",
+    list: "read_only",
+    glob: "read_only",
+    grep: "read_only",
+    webfetch: "read_only",
+    skill: "read_only",
+    todoread: "read_only",
+    todowrite: "read_only",
+    write: "mutating",
+    edit: "mutating",
+    patch: "mutating",
+    bash: "mixed",
+    task: "mixed",
+  },
+}
+
+function globalRuntimeAvailable() {
+  return existsSync(join(GLOBAL_OIF, "runtime", "objective_ledger.py"))
+}
+
+// Make the OIF runtime available inside a project that does not have one.
+// Prefer a directory link to the shared global runtime; fall back to a copy.
+function ensureInstalled(project) {
+  try {
+    if (existsSync(join(project, RUNTIME_REL))) return
+    if (!globalRuntimeAvailable()) return
+    const link = join(project, ".oif")
+    if (existsSync(link)) return
+    try {
+      symlinkSync(GLOBAL_OIF, link, "junction")
+    } catch {
+      cpSync(GLOBAL_OIF, link, { recursive: true })
+    }
+  } catch {}
+}
+
+function ensureProjectConfig(project) {
+  try {
+    const cfg = join(project, CONFIG_REL)
+    if (existsSync(cfg)) return
+    mkdirSync(dirname(cfg), { recursive: true })
+    writeFileSync(cfg, JSON.stringify(DEFAULT_CONFIG, null, 2), { encoding: "utf8" })
+  } catch {}
+}
+
+function activate(project) {
+  if (!project || DISABLED) return
+  ensureInstalled(project)
+  ensureProjectConfig(project)
 }
 
 function runProcess(project, scriptRel, argv, payload, env, timeoutMs = HOOK_TIMEOUT_MS) {
@@ -444,7 +531,7 @@ async function expandPlaceholders(project, sessionID, argv) {
 }
 
 export const OIFPlugin = async ({ client, directory, worktree }) => {
-  const project = resolveProject([worktree, directory, process.env.OIF_PROJECT, process.cwd()])
+  const project = resolveProject([worktree, directory], process.env.OIF_PROJECT || process.cwd())
 
   const log = async (level, message, extra) => {
     if (!client || !client.app || typeof client.app.log !== "function") return
@@ -453,18 +540,32 @@ export const OIFPlugin = async ({ client, directory, worktree }) => {
     } catch {}
   }
 
-  if (!project) {
-    await log("info", "OIF runtime not found; adapter inactive for this project", {
+  if (!project || DISABLED) {
+    await log("info", "OIF adapter inactive (disabled or no project)", {
       directory,
+      disabled: DISABLED,
+    })
+    return {}
+  }
+  if (!existsSync(join(project, RUNTIME_REL)) && !globalRuntimeAvailable()) {
+    await log("info", "OIF runtime not found (neither project .oif nor global); adapter inactive", {
+      directory,
+      global: GLOBAL_OIF,
     })
     return {}
   }
 
   const configPath = join(project, CONFIG_REL)
-  const hook = (event, payload) =>
-    runProcess(project, RUNTIME_REL, ["hook", "--config", configPath, "--event", event], payload)
+  const hook = (event, payload) => {
+    activate(project)
+    return runProcess(project, RUNTIME_REL, ["hook", "--config", configPath, "--event", event], payload)
+  }
 
-  await log("info", "OIF adapter active", { project, enforce: ENFORCE })
+  await log("info", "OIF adapter active", {
+    project,
+    enforce: ENFORCE,
+    usesGlobalRuntime: !existsSync(join(project, RUNTIME_REL)),
+  })
 
   const advisories = new Map()
 
@@ -508,12 +609,11 @@ export const OIFPlugin = async ({ client, directory, worktree }) => {
             .describe("Unique event id; auto-generated when omitted."),
         },
         async execute(args, context) {
-          const proj = resolveProject([
-            context.worktree,
-            context.directory,
-            process.env.OIF_PROJECT,
-            project,
-          ])
+          const proj = resolveProject(
+            [context.worktree, context.directory],
+            process.env.OIF_PROJECT || project,
+          )
+          activate(proj)
           if (!proj) {
             return {
               title: "oif",
@@ -679,12 +779,11 @@ export const OIFPlugin = async ({ client, directory, worktree }) => {
             .describe("Return raw stdout/stderr instead of parsed JSON."),
         },
         async execute(args, context) {
-          const proj = resolveProject([
-            context.worktree,
-            context.directory,
-            process.env.OIF_PROJECT,
-            project,
-          ])
+          const proj = resolveProject(
+            [context.worktree, context.directory],
+            process.env.OIF_PROJECT || project,
+          )
+          activate(proj)
           if (!proj) {
             return { title: "oif_run", output: "No OIF runtime found for this project." }
           }
@@ -754,12 +853,11 @@ export const OIFPlugin = async ({ client, directory, worktree }) => {
           timeoutMs: tool.schema.number().optional().describe("Process timeout in milliseconds."),
         },
         async execute(args, context) {
-          const proj = resolveProject([
-            context.worktree,
-            context.directory,
-            process.env.OIF_PROJECT,
-            project,
-          ])
+          const proj = resolveProject(
+            [context.worktree, context.directory],
+            process.env.OIF_PROJECT || project,
+          )
+          activate(proj)
           if (!proj) {
             return { title: "oif_flow", output: "No OIF runtime found for this project." }
           }
@@ -979,8 +1077,9 @@ export const OIFPlugin = async ({ client, directory, worktree }) => {
     },
 
     "shell.env": async (input, output) => {
-      const proj = resolveProject([input.cwd, process.env.OIF_PROJECT, project])
+      const proj = resolveProject([project, input.cwd], process.env.OIF_PROJECT)
       if (!proj) return
+      activate(proj)
       output.env.OIF_PROJECT = proj
       output.env.OIF_OIF = join(proj, OIF_REL)
       output.env.OIF_RUNTIME = join(proj, RUNTIME_REL)

@@ -28,9 +28,9 @@ through the adapter's tools but are still driven by the agent, per OIF's design
 ## Requirements
 
 - **OpenCode** with plugin support.
-- **OIF installed in your project**: `.oif/runtime/objective_ledger.py` and a
-  config at `.oif-state/config.json`. Install it from the OIF release with
-  `python tools/bootstrap.py --destination <project> --adapter generic --mode complete`.
+- **OIF runtime**: either a project-local install (`.oif/runtime/objective_ledger.py`)
+  or the shared runtime at `~/.config/opencode/oif` (override with `OIF_HOME`).
+  See "Shared runtime and auto-provisioning" below.
 - **Python 3.10+** on `PATH` (or set `OIF_PYTHON`).
 
 ## Install
@@ -57,7 +57,8 @@ If this package is published, add it to `opencode.json`:
 
 ## Configure
 
-Create `<project>/.oif-state/config.json` (see `examples/config.json`):
+The adapter writes `<project>/.oif-state/config.json` automatically (see
+`examples/config.json`). To customize, create it yourself before first use:
 
 ```json
 {
@@ -78,9 +79,20 @@ Create `<project>/.oif-state/config.json` (see `examples/config.json`):
 `"ledger"` means `<project>/.oif-state/ledger`. `tool_classes` maps OpenCode tool
 names to OIF classes (`read_only`, `mutating`, `mixed`, `unknown`).
 
-The adapter activates **only** for projects that contain both
-`.oif/runtime/objective_ledger.py` and `.oif-state/config.json`; it stays inert
-elsewhere.
+### Shared runtime and auto-provisioning
+
+To use the adapter in any project, keep one shared runtime at
+`~/.config/opencode/oif` (override with `OIF_HOME`). When a session opens a
+project that has no `.oif`, the adapter provisions it on first use:
+
+- a directory link `.oif` -> the shared runtime (a junction on Windows; a copy if
+  linking is unavailable), and
+- `.oif-state/config.json` (namespace `opencode`, `data_root` `ledger`).
+
+Project state (`.oif-state/ledger`, `bindings`, `learning.db`, `skill-registry.json`)
+stays inside the project. Set `OIF_DISABLE=1` to keep the adapter inactive
+anywhere. A project that already has its own `.oif` keeps using it (the session
+directory takes precedence over `OIF_PROJECT`).
 
 ## What it does
 
@@ -109,6 +121,8 @@ elsewhere.
 | Variable | Purpose |
 |---|---|
 | `OIF_PYTHON` | Python executable (default: `python` on Windows, `python3` otherwise) |
+| `OIF_HOME` | Shared OIF runtime directory (default `~/.config/opencode/oif`) |
+| `OIF_DISABLE` | `1`/`true` to disable the adapter entirely |
 | `OIF_ENFORCE` | `1`/`true` to hard-block a mutating tool on an OIF hold (default: advisory) |
 | `OIF_HOOK_TIMEOUT_MS` | Per-command timeout (default 15000) |
 | `OIF_PROJECT` | Override project root (default: discovered from the session directory) |
