@@ -4,3 +4,8 @@ npm-debug.log*
 .DS_Store
 .idea/
 .vscode/
+
+# OIF runtime and per-project state (local ledgers contain task text)
+.oif
+.oif-state
+.objective-integrity-backups
