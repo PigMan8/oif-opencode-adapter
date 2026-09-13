@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.3
+
+- Resolve the project from the most specific safe session directory, so hosts
+  that pass a broad worktree (for example a drive root) alongside the real
+  session directory still provision the intended project.
+
 ## 0.2.2
 
 - Do not auto-provision a drive root, the home directory, or known system

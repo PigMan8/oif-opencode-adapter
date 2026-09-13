@@ -170,3 +170,17 @@ test("isUnsafeProject rejects roots, home, and system dirs", () => {
   assert.equal(isUnsafeProject(join(homedir(), "AppData")), true)
   assert.equal(isUnsafeProject(join(tmpdir(), "my-project")), false)
 })
+
+test("resolveProject prefers a deeper safe dir over a drive root", () => {
+  const dir = mkdtempSync(join(tmpdir(), "oif-deep-"))
+  try {
+    const root = parse(dir).root
+    assert.equal(resolveProject([root, dir]), dir)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test("resolveProject returns null when only unsafe session dirs are known", () => {
+  assert.equal(resolveProject([parse(tmpdir()).root]), null)
+})

@@ -157,18 +157,24 @@ function findMarkerUp(start, seen) {
 
 function resolveProject(starts, override) {
   const seen = new Set()
-  const session = starts.filter(Boolean)
+  const session = []
+  for (const start of starts.filter(Boolean)) {
+    try {
+      session.push(resolve(start))
+    } catch {}
+  }
   // 1. Nearest ancestor with a project-local OIF, from the session location.
   for (const start of session) {
     const found = findMarkerUp(start, seen)
     if (found) return found
   }
-  // 2. No project-local OIF: use the session directory and provision it.
-  for (const start of session) {
-    try {
-      const dir = resolve(start)
-      if (existsSync(dir)) return dir
-    } catch {}
+  // 2. No project-local OIF: use the most specific safe session directory.
+  //    Some hosts pass a broad worktree (e.g. a drive root) alongside the real
+  //    session directory, so prefer the deepest existing, safe path.
+  const usable = session.filter((dir) => existsSync(dir) && !isUnsafeProject(dir))
+  if (usable.length) {
+    usable.sort((a, b) => b.length - a.length)
+    return usable[0]
   }
   // 3. Explicit override / cwd as a last resort.
   if (override) {
@@ -176,7 +182,7 @@ function resolveProject(starts, override) {
     if (found) return found
     try {
       const dir = resolve(override)
-      if (existsSync(dir)) return dir
+      if (existsSync(dir) && !isUnsafeProject(dir)) return dir
     } catch {}
   }
   return null
